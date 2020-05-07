@@ -198,6 +198,8 @@ windows 下使用 git-bash 或者 cmder 等终端执行以下命令:
 $ set PORT=4000 && node app.js
 ```
 
+使用环境变量 `FAKE_IP_CONFIG_PATH` 指示假 IP 配置文件路径，假 IP 配置文件中，每行为一个假 IP，程序将随机挑选一个作为请求头中 X-Real-IP 的值
+
 ## 使用文档
 
 [文档地址](https://binaryify.github.io/NeteaseCloudMusicApi)
