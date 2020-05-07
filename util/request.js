@@ -3,6 +3,7 @@ const request = require('request')
 const queryString = require('querystring')
 const PacProxyAgent = require('pac-proxy-agent')
 const zlib = require('zlib')
+const fs = require('fs')
 
 // request.debug = true // 开启可看到更详细信息
 
@@ -32,15 +33,18 @@ const chooseUserAgent = ua => {
   return userAgentList[index]
 }
 
-const createRequest = (method, url, data, options) => {
+const _createRequest = (method, url, data, options, xRealIp) => {
   return new Promise((resolve, reject) => {
     let headers = { 'User-Agent': chooseUserAgent(options.ua) }
     if (method.toUpperCase() === 'POST')
       headers['Content-Type'] = 'application/x-www-form-urlencoded'
     if (url.includes('music.163.com'))
       headers['Referer'] = 'https://music.163.com'
-    // headers['X-Real-IP'] = '118.88.88.88'
-
+    // 如果提供了 X-Real-IP，加入请求头
+    if (xRealIp) {
+      headers['X-Real-IP'] = xRealIp;
+      console.log(`headers['X-Real-IP']: ${headers['X-Real-IP']}`);
+    }
     if (typeof options.cookie === 'object')
       headers['Cookie'] = Object.keys(options.cookie)
         .map(
@@ -130,10 +134,10 @@ const createRequest = (method, url, data, options) => {
               zlib.unzip(body, function (err, buffer) {
                 const _buffer = err ? body : buffer
                 try {
-                  try{
+                  try {
                     answer.body = JSON.parse(encrypt.decrypt(_buffer).toString())
                     answer.status = answer.body.code || res.statusCode
-                  } catch(e){
+                  } catch (e) {
                     answer.body = JSON.parse(_buffer.toString())
                     answer.status = res.statusCode
                   }
@@ -152,7 +156,7 @@ const createRequest = (method, url, data, options) => {
 
               answer.body = JSON.parse(body)
               answer.status = answer.body.code || res.statusCode
-              if(answer.body.code === 502){
+              if (answer.body.code === 502) {
                 answer.status = 200
               }
             }
@@ -169,7 +173,32 @@ const createRequest = (method, url, data, options) => {
         }
       }
     )
-  })
+  });
+}
+
+const createRequest = (method, url, data, options) => {
+  return new Promise((resolve, reject) => {
+    // 加载假 IP 配置文件
+    const fake_ip_config_path = process.env.fake_ip_config_path
+    // 如果指定的文件存在则读取配置
+    if (fs.existsSync(fake_ip_config_path)) {
+      fs.readFile(fake_ip_config_path, { encoding: 'utf-8' }, (err, content) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(content);
+        }
+      });
+    } else {
+      reject('no config file');
+    }
+  }).then((content) => {
+    lines = content.split('\n');
+    return _createRequest(method, url, data, options, lines[Math.floor(Math.random() * lines.length)].trim());
+  }, (reason) => {
+    console.log(reason);
+    return _createRequest(method, url, data, options, null);
+  });
 }
 
 module.exports = createRequest
