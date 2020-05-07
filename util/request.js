@@ -7,6 +7,21 @@ const fs = require('fs')
 
 // request.debug = true // 开启可看到更详细信息
 
+// 首先尝试加载伪造 X-Real-IP 的文件内容
+let lines = [];
+const fake_ip_config_path = process.env.fake_ip_config_path
+if (fs.existsSync(fake_ip_config_path)) {
+  const content = fs.readFileSync(fake_ip_config_path, { encoding: 'utf-8' });
+  lines = content.split('\n');
+}
+
+const chooseXRealIp = () => {
+  const result = lines[Math.floor(Math.random() * lines.length)];
+  if (result) {
+    return result.trim();
+  }
+};
+
 const chooseUserAgent = ua => {
   const userAgentList = [
     'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1',
@@ -33,7 +48,7 @@ const chooseUserAgent = ua => {
   return userAgentList[index]
 }
 
-const _createRequest = (method, url, data, options, xRealIp) => {
+const createRequest = (method, url, data, options) => {
   return new Promise((resolve, reject) => {
     let headers = { 'User-Agent': chooseUserAgent(options.ua) }
     if (method.toUpperCase() === 'POST')
@@ -41,6 +56,7 @@ const _createRequest = (method, url, data, options, xRealIp) => {
     if (url.includes('music.163.com'))
       headers['Referer'] = 'https://music.163.com'
     // 如果提供了 X-Real-IP，加入请求头
+    const xRealIp = chooseXRealIp();
     if (xRealIp) {
       headers['X-Real-IP'] = xRealIp;
       console.log(`headers['X-Real-IP']: ${headers['X-Real-IP']}`);
@@ -176,29 +192,5 @@ const _createRequest = (method, url, data, options, xRealIp) => {
   });
 }
 
-const createRequest = (method, url, data, options) => {
-  return new Promise((resolve, reject) => {
-    // 加载假 IP 配置文件
-    const fake_ip_config_path = process.env.fake_ip_config_path
-    // 如果指定的文件存在则读取配置
-    if (fs.existsSync(fake_ip_config_path)) {
-      fs.readFile(fake_ip_config_path, { encoding: 'utf-8' }, (err, content) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(content);
-        }
-      });
-    } else {
-      reject('no config file');
-    }
-  }).then((content) => {
-    lines = content.split('\n');
-    return _createRequest(method, url, data, options, lines[Math.floor(Math.random() * lines.length)].trim());
-  }, (reason) => {
-    console.log(reason);
-    return _createRequest(method, url, data, options, null);
-  });
-}
 
 module.exports = createRequest
